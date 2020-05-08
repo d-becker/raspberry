@@ -12,6 +12,8 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.image import Image as CoreImage
 from kivy.uix.image import Image as ImageWidget
+from kivy.uix.popup import Popup
+from kivy.uix.label import Label
 
 try:
     import picamera
@@ -43,7 +45,7 @@ class PiCamera(Camera):
 class MockCamera(Camera):
     def __init__(self):
         self.images = [PIL.Image.open('samples/picture_%i.jpg' % i) for i in range(60)]
-        self.index = 0
+        self.index = 15 # TODO: 0.
 
     def capture(self):
         res = self.images[self.index]
@@ -55,26 +57,33 @@ class ImageDisplay:
         self.image_widget = image_widget
 
     def update_image(self, im):
-        data = self.__img_to_bytes(im)
-        core_image = CoreImage(data, ext='png')
+        core_image = self.__to_core_image(im)
         self.image_widget.texture = core_image.texture
 
     def motion_alert(self, im):
-        print('Sending motion alert')
-        exec_name = sys.argv[0]
-        img_bytes = self.__img_to_bytes(im)
+        # print('Sending motion alert')
+        # exec_name = sys.argv[0]
+        # img_bytes = self.__img_to_bytes(im)
 
-        process = subprocess.Popen(['python3', exec_name, 'alert'], stdin=subprocess.PIPE)
-        process.stdin.write(img_bytes.getvalue())
-        process.stdin.flush()
-        process.stdin.close()
+        # process = subprocess.Popen(['python3', exec_name, 'alert'], stdin=subprocess.PIPE)
+        # process.stdin.write(img_bytes.getvalue())
+        # process.stdin.flush()
+        # process.stdin.close()
+
+        core_image = self.__to_core_image(im)
+        alert_widget = ImageWidget()
+        alert_widget.texture = core_image.texture
+        popup = Popup(title='Alert', content=alert_widget, size_hint=(0.2, 0.2))
+        Clock.schedule_once(lambda dt: popup.open(), 0)
+        Clock.schedule_once(lambda dt: popup.dismiss(), 0.8)
 
     @staticmethod
-    def __img_to_bytes(im):
+    def __to_core_image(im):
         data = io.BytesIO()
         im.save(data, format='png')
         data.seek(0)
-        return data
+        core_image = CoreImage(data, ext='png')
+        return core_image
 
 class GuiApp(App):
     def __init__(self, title, displayed_image, **kwargs):
