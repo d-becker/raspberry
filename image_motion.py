@@ -55,27 +55,18 @@ class MockCamera(Camera):
 class ImageDisplay:
     def __init__(self, image_widget):
         self.image_widget = image_widget
+        self.alert_widget = ImageWidget()
+        self.popup = Popup(title='Alert', content=self.alert_widget, size_hint=(0.4, 0.4))
 
     def update_image(self, im):
         core_image = self.__to_core_image(im)
         self.image_widget.texture = core_image.texture
 
     def motion_alert(self, im):
-        # print('Sending motion alert')
-        # exec_name = sys.argv[0]
-        # img_bytes = self.__img_to_bytes(im)
-
-        # process = subprocess.Popen(['python3', exec_name, 'alert'], stdin=subprocess.PIPE)
-        # process.stdin.write(img_bytes.getvalue())
-        # process.stdin.flush()
-        # process.stdin.close()
-
         core_image = self.__to_core_image(im)
-        alert_widget = ImageWidget()
-        alert_widget.texture = core_image.texture
-        popup = Popup(title='Alert', content=alert_widget, size_hint=(0.2, 0.2))
-        Clock.schedule_once(lambda dt: popup.open(), 0)
-        Clock.schedule_once(lambda dt: popup.dismiss(), 0.8)
+        self.alert_widget.texture = core_image.texture
+        Clock.schedule_once(lambda dt: self.popup.open(), 0)
+        Clock.schedule_once(lambda dt: self.popup.dismiss(), 0.8)
 
     @staticmethod
     def __to_core_image(im):
@@ -143,7 +134,6 @@ def detect_motion(im1, im2, pixel_diff_threshold):
     diff = ImageChops.difference(gray1, gray2)
     diff_thresholded = diff.point(lambda p: p > pixel_diff_threshold)
     return ImageStat.Stat(diff_thresholded).sum[0]
-
 
 def create_diffs(imgs, threshold):
     pairs = list(zip(imgs, imgs[1:]))
