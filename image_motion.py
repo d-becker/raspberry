@@ -1,5 +1,7 @@
 import io
 import datetime
+import subprocess
+import sys
 import time
 
 import PIL
@@ -53,33 +55,47 @@ class ImageDisplay:
         self.image_widget = image_widget
 
     def update_image(self, im):
-        data = io.BytesIO()
-        im.save(data, format='png')
-        data.seek(0)
+        data = self.__img_to_bytes(im)
         core_image = CoreImage(data, ext='png')
         self.image_widget.texture = core_image.texture
 
     def motion_alert(self, im):
-        pass
+        print('Sending motion alert')
+        exec_name = sys.argv[0]
+        img_bytes = self.__img_to_bytes(im)
+
+        process = subprocess.Popen(['python3', exec_name, 'alert'], stdin=subprocess.PIPE)
+        process.stdin.write(img_bytes.getvalue())
+        process.stdin.flush()
+        process.stdin.close()
+
+    @staticmethod
+    def __img_to_bytes(im):
+        data = io.BytesIO()
+        im.save(data, format='png')
+        data.seek(0)
+        return data
 
 class GuiApp(App):
-    def __init__(self, **kwargs):
+    def __init__(self, title, displayed_image, **kwargs):
         super(GuiApp, self).__init__(**kwargs)
-        self.normal_image = ImageWidget()
+        self.title = title
+        self.displayed_image = displayed_image
 
     def build(self):
-        return self.normal_image
+        return self.displayed_image
 
-class SecurityApp:
+class Backend:
     def __init__(self,
                  camera,
                  image_display,
+                 crop_box,
                  pixel_threshold,
-                 motion_threshold,
-                 mock):
+                 motion_threshold):
         self.camera = camera
         self.image_display = image_display
 
+        self.crop_box = crop_box
         self.pixel_threshold = pixel_threshold
         self.motion_threshold = motion_threshold
 
@@ -91,16 +107,12 @@ class SecurityApp:
         self.__update_display()
         self.__handle_motion()
 
-    def __wait(self):
-        next_second = (datetime.datetime.now() + datetime.timedelta(seconds=1)).replace(
-                microsecond=0)
-        delay = (next_second - datetime.datetime.now()).total_seconds()
-        print("Delay: {}.".format(delay))
-        time.sleep(delay)
+    def preprocess_image(self, im):
+        return im.crop(self.crop_box)
 
     def __update_images(self):
         self.old_image = self.new_image
-        self.new_image = crop_to_quarter_9_12(self.camera.capture())
+        self.new_image = self.preprocess_image(self.camera.capture())
 
     def __update_display(self):
         print("Updating image.")
@@ -113,7 +125,7 @@ class SecurityApp:
         diff_score = detect_motion(self.old_image, self.new_image, self.pixel_threshold)
         if diff_score > self.motion_threshold:
             print("Motion detected: {}.".format(diff_score))
-        pass
+            self.image_display.motion_alert(self.new_image)
 
 def detect_motion(im1, im2, pixel_diff_threshold):
     gray1 = im1.convert('L')
@@ -123,9 +135,6 @@ def detect_motion(im1, im2, pixel_diff_threshold):
     diff_thresholded = diff.point(lambda p: p > pixel_diff_threshold)
     return ImageStat.Stat(diff_thresholded).sum[0]
 
-def crop_to_quarter_9_12(im):
-    box = (215, 245, 495, 480)
-    return im.crop(box)
 
 def create_diffs(imgs, threshold):
     pairs = list(zip(imgs, imgs[1:]))
@@ -135,22 +144,36 @@ def print_list(l):
     for i, elem in enumerate(l):
         print("%i: %i" %(i, elem))
 
-def main():
-    global images, cropped
-    images = [PIL.Image.open('samples/picture_%i.jpg' % i) for i in range(60)]
-    cropped = [crop_to_quarter_9_12(im) for im in images]
+def start_alert_process():
+    img_data = sys.stdin.buffer.read()
+    img_data = io.BytesIO(img_data)
+    core_image = CoreImage(img_data, ext='png')
+    displayed_image = ImageWidget()
+    displayed_image.texture = core_image.texture
 
-def create_apps(pixel_threshold = 10,
-               motion_threshold = 1000,
-               mock = False):
+    gui_app = GuiApp('Alert', displayed_image)
+    Clock.schedule_interval(lambda dt: gui_app.stop(), 1)
+    gui_app.run()
+
+def start_normal_process(pixel_threshold = 10,
+        motion_threshold = 1000,
+        mock = False):
     camera = Camera.create_camera(mock)
-    gui_app = GuiApp()
-    img_display = ImageDisplay(gui_app.normal_image)
-    security_app = SecurityApp(camera, img_display, pixel_threshold, motion_threshold, mock)
+    displayed_image = ImageWidget()
+    image_display = ImageDisplay(displayed_image)
+    box = (215, 245, 495, 480)
 
-    Clock.schedule_interval(lambda dt: security_app.update(), 1)
+    gui_app = GuiApp('Normal', displayed_image)
+    backend = Backend(camera, image_display, box, pixel_threshold, motion_threshold)
+
+    backend.update()
+    Clock.schedule_interval(lambda dt: backend.update(), 1)
 
     gui_app.run()
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == 'alert':
+        start_alert_process()
+    else:
+        mock = 'mock' in sys.argv[1:]
+        start_normal_process(mock=mock)
