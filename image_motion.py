@@ -112,9 +112,9 @@ class ImageDisplay:
     @staticmethod
     def __to_core_image(img):
         data = io.BytesIO()
-        img.save(data, format='png')
+        img.save(data, format='jpeg')
         data.seek(0)
-        core_image = CoreImage(data, ext='png')
+        core_image = CoreImage(data, ext='jpg')
         return core_image
 
 class GuiApp(App):
@@ -165,7 +165,8 @@ class Backend:
         self.pixel_threshold = pixel_threshold
         self.motion_threshold = motion_threshold
 
-        self.old_image = None
+        self.old_gray_image = None
+        self.new_gray_image = None
         self.new_image = None
 
     def update(self):
@@ -178,23 +179,27 @@ class Backend:
         self.__handle_motion()
 
     def __preprocess_image(self, img):
-        return img.crop(self.crop_box)
+        cropped = img.crop(self.crop_box)
+        gray = cropped.convert('L')
+        return cropped, gray
 
     def __update_images(self):
-        self.old_image = self.new_image
-        self.new_image = self.__preprocess_image(self.camera.capture())
+        self.old_gray_image = self.new_gray_image
+        self.new_image, self.new_gray_image = self.__preprocess_image(
+            self.camera.capture())
 
     def __update_display(self):
         print("Updating image.")
         self.image_display.update_image(self.new_image)
 
     def __handle_motion(self):
-        if self.old_image is None or self.new_image is None:
+        if self.old_gray_image is None or self.new_gray_image is None:
             return
 
-        diff_score = detect_motion(self.old_image, self.new_image, self.pixel_threshold)
+        diff_score = detect_motion_gray(self.old_gray_image, self.new_gray_image,
+            self.pixel_threshold)
         if diff_score > self.motion_threshold:
-            print("Motion detected: {}.".format(diff_score))
+            print("Motion detected, score: {}.".format(diff_score))
             self.image_display.motion_alert()
 
 def detect_motion(im1, im2, pixel_diff_threshold):
@@ -213,6 +218,12 @@ def detect_motion(im1, im2, pixel_diff_threshold):
     gray1 = im1.convert('L')
     gray2 = im2.convert('L')
 
+    return detect_motion_gray(gray1, gray2, pixel_diff_threshold)
+
+def detect_motion_gray(gray1, gray2, pixel_diff_threshold):
+    """
+    Like 'detect_motion' but on already grayscale images.
+    """
     diff = ImageChops.difference(gray1, gray2)
     diff_thresholded = diff.point(lambda p: p > pixel_diff_threshold)
     return ImageStat.Stat(diff_thresholded).mean[0]
