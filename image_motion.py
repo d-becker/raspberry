@@ -91,6 +91,8 @@ class ImageDisplay:
         self.image_widget = image_widget
         self.alert_widget = ImageWidget()
         self.popup = Popup(title='Alert', content=self.alert_widget, size_hint=(0.4, 0.4))
+        self.popup.on_open = lambda: Clock.schedule_once(
+            lambda dt: self.popup.dismiss(), 0.8)
 
     def update_image(self, img):
         """
@@ -105,7 +107,7 @@ class ImageDisplay:
         """
         self.alert_widget.texture = self.image_widget.texture
         Clock.schedule_once(lambda dt: self.popup.open(), 0)
-        Clock.schedule_once(lambda dt: self.popup.dismiss(), 1)
+        # Clock.schedule_once(lambda dt: self.popup.dismiss(), 1)
 
     @staticmethod
     def __to_core_image(img):
