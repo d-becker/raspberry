@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import io
 import datetime
 import subprocess
@@ -62,9 +64,8 @@ class ImageDisplay:
         core_image = self.__to_core_image(im)
         self.image_widget.texture = core_image.texture
 
-    def motion_alert(self, im):
-        core_image = self.__to_core_image(im)
-        self.alert_widget.texture = core_image.texture
+    def motion_alert(self):
+        self.alert_widget.texture = self.image_widget.texture
         Clock.schedule_once(lambda dt: self.popup.open(), 0)
         Clock.schedule_once(lambda dt: self.popup.dismiss(), 1)
 
@@ -125,7 +126,7 @@ class Backend:
         diff_score = detect_motion(self.old_image, self.new_image, self.pixel_threshold)
         if diff_score > self.motion_threshold:
             print("Motion detected: {}.".format(diff_score))
-            self.image_display.motion_alert(self.new_image)
+            self.image_display.motion_alert()
 
 def detect_motion(im1, im2, pixel_diff_threshold):
     gray1 = im1.convert('L')
