@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
+import argparse
 import io
+import os
 import sys
 
 import PIL
 import PIL.ImageChops as ImageChops
 import PIL.ImageStat as ImageStat
+
+# Prevent kivy from parsing CLI arguments so we can have our own.
+os.environ["KIVY_NO_ARGS"] = "1"
 
 from kivy.app import App
 from kivy.clock import Clock
@@ -230,9 +235,10 @@ def start_alert_process():
     Clock.schedule_interval(lambda dt: gui_app.stop(), 1)
     gui_app.run()
 
-def start_normal_process(pixel_threshold=10,
-        motion_threshold=0.015,
-        mock=False):
+def start_normal_process(pixel_threshold,
+        motion_threshold,
+        box,
+        mock):
     """
     Start the application. for 'pixel_threshold' and 'motion_threshold', see Backend. If
     'mock' is true, MockCamera is used and no images are actually taken. This is also the
@@ -242,7 +248,6 @@ def start_normal_process(pixel_threshold=10,
     camera = Camera.create_camera(mock)
     displayed_image = ImageWidget(allow_stretch=True)
     image_display = ImageDisplay(displayed_image)
-    box = (215, 245, 495, 480)
 
     gui_app = GuiApp('Normal', displayed_image)
     backend = Backend(camera, image_display, box, pixel_threshold, motion_threshold)
@@ -255,9 +260,32 @@ def start_normal_process(pixel_threshold=10,
 
     gui_app.run()
 
+def create_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-m", "--mock", action='store_true',
+        help="Use a mock camera with pre-captured images.")
+    parser.add_argument("-p", "--pixel_threshold", type=int, default=10,
+        choices=range(0, 256),
+        help="Threshold (in intensity) for determining"
+             "if two pixel values should be treated as different")
+    parser.add_argument("-t", "--motion_threshold", type=float, default=0.015,
+        help="The ratio of \"different\" pixels between two images above"
+             "which it is considered that there is motion between the images.")
+    parser.add_argument("-b", "--box", type=int, nargs=4, default=(450, 170, 740, 410),
+        help="The coordinates of the region of interest (left, upper, right, lower).")
+
+    return parser
+
 def main():
-    mock = 'mock' in sys.argv[1:]
-    start_normal_process(mock=mock)
+    parser = create_parser()
+    args = parser.parse_args()
+
+    # box_samples = (215, 245, 495, 480)
+    # box_night_samples = (450, 170, 740, 410)
+
+    start_normal_process(pixel_threshold=args.pixel_threshold,
+        motion_threshold=args.motion_threshold, box=args.box, mock=args.mock)
 
 if __name__ == "__main__":
     main()
