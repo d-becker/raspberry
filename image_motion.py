@@ -66,7 +66,7 @@ class ImageDisplay:
         core_image = self.__to_core_image(im)
         self.alert_widget.texture = core_image.texture
         Clock.schedule_once(lambda dt: self.popup.open(), 0)
-        Clock.schedule_once(lambda dt: self.popup.dismiss(), 0.8)
+        Clock.schedule_once(lambda dt: self.popup.dismiss(), 1)
 
     @staticmethod
     def __to_core_image(im):
@@ -158,7 +158,7 @@ def start_normal_process(pixel_threshold = 10,
         motion_threshold = 1000,
         mock = False):
     camera = Camera.create_camera(mock)
-    displayed_image = ImageWidget()
+    displayed_image = ImageWidget(allow_stretch=True)
     image_display = ImageDisplay(displayed_image)
     box = (215, 245, 495, 480)
 
@@ -166,7 +166,7 @@ def start_normal_process(pixel_threshold = 10,
     backend = Backend(camera, image_display, box, pixel_threshold, motion_threshold)
 
     backend.update()
-    Clock.schedule_interval(lambda dt: backend.update(), 1)
+    Clock.schedule_interval(lambda dt: backend.update(), 2)
 
     gui_app.run()
 
