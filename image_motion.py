@@ -134,7 +134,7 @@ def detect_motion(im1, im2, pixel_diff_threshold):
 
     diff = ImageChops.difference(gray1, gray2)
     diff_thresholded = diff.point(lambda p: p > pixel_diff_threshold)
-    return ImageStat.Stat(diff_thresholded).sum[0]
+    return ImageStat.Stat(diff_thresholded).mean[0]
 
 def create_diffs(imgs, threshold):
     pairs = list(zip(imgs, imgs[1:]))
@@ -156,7 +156,7 @@ def start_alert_process():
     gui_app.run()
 
 def start_normal_process(pixel_threshold = 10,
-        motion_threshold = 1000,
+        motion_threshold = 0.015,
         mock = False):
     camera = Camera.create_camera(mock)
     displayed_image = ImageWidget(allow_stretch=True)
