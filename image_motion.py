@@ -15,7 +15,10 @@ os.environ["KIVY_NO_ARGS"] = "1"
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.core.image import Image as CoreImage
+from kivy.graphics.texture import Texture
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.image import Image as ImageWidget
+from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 
 # If picamera cannot be imported (for example we are not running on a Raspberry Pi), set
@@ -87,12 +90,10 @@ class ImageDisplay:
     the images and alerts.
     """
 
-    def __init__(self, image_widget):
+    def __init__(self, image_widget, alert_image_widget):
         self.image_widget = image_widget
-        self.alert_widget = ImageWidget()
-        self.popup = Popup(title='Alert', content=self.alert_widget, size_hint=(0.4, 0.4))
-        self.popup.on_open = lambda: Clock.schedule_once(
-            lambda dt: self.popup.dismiss(), 0.8)
+        self.alert_image_widget = alert_image_widget
+        self.alert_image_widget.texture = self.image_widget.texture
 
     def update_image(self, img):
         """
@@ -101,13 +102,13 @@ class ImageDisplay:
         core_image = self.__to_core_image(img)
         self.image_widget.texture = core_image.texture
 
+        self.alert_image_widget.texture = Texture.create(size=core_image.texture.size)
+
     def motion_alert(self):
         """
         Displays a motion alert.
         """
-        self.alert_widget.texture = self.image_widget.texture
-        Clock.schedule_once(lambda dt: self.popup.open(), 0)
-        # Clock.schedule_once(lambda dt: self.popup.dismiss(), 1)
+        self.alert_image_widget.texture = self.image_widget.texture
 
     @staticmethod
     def __to_core_image(img):
@@ -122,13 +123,32 @@ class GuiApp(App):
     The class handling the graphical user interface.
     """
 
-    def __init__(self, title, displayed_image, **kwargs):
+    def __init__(self, title, displayed_image, alert_image, **kwargs):
         super(GuiApp, self).__init__(**kwargs)
         self.title = title
-        self.displayed_image = displayed_image
+
+        self.box_layout = BoxLayout(orientation='horizontal')
+        self.labelled_img = self.LabelledImage("Normal image", displayed_image)
+        self.labelled_alert = self.LabelledImage("Alert", alert_image)
+
+        self.box_layout.add_widget(self.labelled_img)
+        self.box_layout.add_widget(self.labelled_alert)
+
+    class LabelledImage(BoxLayout):
+        """
+        An image widget with a label widget above it.
+        """
+
+        def __init__(self, text, displayed_image, **kwargs):
+            super(GuiApp.LabelledImage, self).__init__(orientation='vertical', **kwargs)
+            self.label = Label(text=text, size_hint=(1, 0.1))
+            self.displayed_image = displayed_image
+
+            self.add_widget(self.label)
+            self.add_widget(self.displayed_image)
 
     def build(self):
-        return self.displayed_image
+        return self.box_layout
 
 class Backend:
     """
@@ -236,18 +256,6 @@ def print_list(l):
     for i, elem in enumerate(l):
         print("%i: %i" %(i, elem))
 
-# TODO: Probably we don't need this.
-def start_alert_process():
-    img_data = sys.stdin.buffer.read()
-    img_data = io.BytesIO(img_data)
-    core_image = CoreImage(img_data, ext='png')
-    displayed_image = ImageWidget()
-    displayed_image.texture = core_image.texture
-
-    gui_app = GuiApp('Alert', displayed_image)
-    Clock.schedule_interval(lambda dt: gui_app.stop(), 1)
-    gui_app.run()
-
 def start_normal_process(pixel_threshold,
         motion_threshold,
         box,
@@ -260,9 +268,10 @@ def start_normal_process(pixel_threshold,
     """
     camera = Camera.create_camera(mock)
     displayed_image = ImageWidget(allow_stretch=True)
-    image_display = ImageDisplay(displayed_image)
+    alert_image = ImageWidget(allow_stretch=True)
+    image_display = ImageDisplay(displayed_image, alert_image)
 
-    gui_app = GuiApp('Normal', displayed_image)
+    gui_app = GuiApp('Normal', displayed_image, alert_image)
     backend = Backend(camera, image_display, box, pixel_threshold, motion_threshold)
 
     backend.update()
