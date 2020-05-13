@@ -271,7 +271,7 @@ def start_normal_process(pixel_threshold,
     alert_image = ImageWidget(allow_stretch=True)
     image_display = ImageDisplay(displayed_image, alert_image)
 
-    gui_app = GuiApp('Normal', displayed_image, alert_image)
+    gui_app = GuiApp('Security Camera', displayed_image, alert_image)
     backend = Backend(camera, image_display, box, pixel_threshold, motion_threshold)
 
     backend.update()
